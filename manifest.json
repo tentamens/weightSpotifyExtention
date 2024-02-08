@@ -1,0 +1,16 @@
+
+{
+  "manifest_version": 3,
+  "name": "Spotify Extension",
+  "version": "1.0",
+  "permissions": ["activeTab", "tabs", "webNavigation", "storage"],
+  "content_scripts": [
+    {
+      "matches": ["*://open.spotify.com/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
