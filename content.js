@@ -18,6 +18,9 @@ token = localStorage.getItem("token");
 
 var weights = localStorage.getItem("weights");
 
+if (weights == null) {
+  weights = {};
+}
 setInterval(async () => {
   songPlayTime += 0.2;
   const anchorElement = document.querySelector(
@@ -26,7 +29,6 @@ setInterval(async () => {
   if (anchorElement) {
     const songTitle = anchorElement.textContent.trim();
     await updateCurrentSong(songTitle);
-    // You can perform further actions with the song title here
   } else {
     console.log("No song currently playing.");
   }
@@ -37,7 +39,6 @@ async function updateCurrentSong(songTitle) {
     return;
   }
   currentPlayingSong = songTitle;
-  var randomNumber = Math.floor(Math.random() * 10) + 1;
   await listeningToNewSong();
 }
 
@@ -51,17 +52,69 @@ async function listeningToNewSong() {
   }
   lastPlayingSong = currentPlayingSong;
   var queueTracks = await getUseQue();
-  getNextSong(queueTracks);
+  await getNextSong(queueTracks);
 }
 
-function getNextSong(queue) {
-  queue.queue.forEach((element) => {
-    console.log(element);
+async function getNextSong(queue) {
+  var songToPlay;
+  var songPicked = false;
+  var songIndex = 0;
+  queue.queue.every((element, v) => {
+    var isSongPicked = calcSongWeight(element);
+
+    if (!isSongPicked) {
+      return true;
+    }
+    songToPlay = element;
+    songPicked = true;
+    songIndex = v + 1;
+    return false;
   });
-  console.log(queue.queue[2].name);
+  if (!songPicked) {
+    noSongPicked();
+  }
+  await makeSkips(songIndex);
 }
 
-function getSongWeight() {}
+async function makeSkips(numberOfSkips) {
+  for (let i = 0; i < numberOfSkips; i++) {
+    setTimeout(async () => {
+      await makeSkipCalls();
+      `$`;
+    }, 20);
+  }
+}
+
+async function makeSkipCalls() {
+  await fetch("https://api.spotify.com/v1/me/player/next", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+  
+}
+
+function noSongPicked() {
+  console.log("No song picked");
+  return;
+  //cry
+}
+
+function calcSongWeight(songName) {
+  console.log("hello world");
+  if (!songName in weights) {
+    weights[songName] = 8;
+  }
+  const songWeight = weights[songName];
+  var randomNumber = Math.floor(Math.random() * 10) + 1;
+  console.log(randomNumber);
+  if (randomNumber >= songWeight) {
+    return false;
+  }
+
+  return true;
+}
 
 async function getUseQue() {
   var queue;
