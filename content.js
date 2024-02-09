@@ -10,6 +10,8 @@ var clientId = "6b71231841e2457480410c0c5a90d3b6";
 
 var refresh = false;
 
+var isSkippingSongs = false;
+
 //localStorage.setItem("token", ""your token)
 //localStorage.setItem("refreshToken", "Your refresh token")
 
@@ -21,6 +23,7 @@ var weights = localStorage.getItem("weights");
 if (weights == null) {
   weights = {};
 }
+
 setInterval(async () => {
   songPlayTime += 0.2;
   const anchorElement = document.querySelector(
@@ -49,10 +52,52 @@ async function listeningToNewSong() {
   refresh = true;
   if (currentPlayingSong == lastPlayingSong) {
     songPlayTime = 0.0;
+    return;
   }
+  calcNewWieght(currentPlayingSong);
   lastPlayingSong = currentPlayingSong;
   var queueTracks = await getUseQue();
   await getNextSong(queueTracks);
+}
+
+function calcNewWieght(songName) {
+  if (isSkippingSongs) {
+    return;
+  }
+
+  if (!songName in weights) {
+    weights[songName] = 8;
+    return;
+  }
+
+  if (songPlayTime > 30.0) {
+    weights[songName] = weights[songName] + 2;
+    checkIf0or10(songName);
+    return;
+  }
+
+  if (songPlayTime < 5.0) {
+    weights[songName] = weights[songName] - 2;
+    checkIf0or10(songName);
+    return;
+  }
+
+  if (songPlayTime < 30.0) {
+    weights[songName] = weights[songName] - 1;
+    checkIf0or10(songName);
+    return;
+  }
+}
+
+function checkIf0or10(songName) {
+  if (weights[songName] < 1) {
+    weights[songName] = 1;
+  }
+
+  if (weights[songName] > 10) {
+    weights[songName] = 10;
+  }
+  localStorage.setItem("weights", JSON.stringify(weights));
 }
 
 async function getNextSong(queue) {
@@ -73,26 +118,28 @@ async function getNextSong(queue) {
   if (!songPicked) {
     noSongPicked();
   }
+  currentPlayingSong = songToPlay;
   await makeSkips(songIndex);
 }
 
 async function makeSkips(numberOfSkips) {
+  isSkippingSongs = true;
   for (let i = 0; i < numberOfSkips; i++) {
     setTimeout(async () => {
       await makeSkipCalls();
       `$`;
     }, 20);
   }
+  isSkippingSongs = false;
 }
 
 async function makeSkipCalls() {
   await fetch("https://api.spotify.com/v1/me/player/next", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`
-    }
+      Authorization: `Bearer ${token}`,
+    },
   });
-  
 }
 
 function noSongPicked() {
