@@ -1,5 +1,6 @@
 var currentPlayingSong = "";
 var lastPlayingSong = "";
+var justSkippedSong = ".";
 
 var songPlayTime = 0.0;
 
@@ -7,8 +8,6 @@ var token;
 var refreshToken;
 
 var clientId = "6b71231841e2457480410c0c5a90d3b6";
-
-var refresh = false;
 
 var isSkippingSongs = false;
 
@@ -20,12 +19,20 @@ token = localStorage.getItem("token");
 
 var weights = localStorage.getItem("weights");
 
+console.log(weights);
+
+weights = {};
+
 if (weights == null) {
   weights = {};
+  localStorage.setItem("weights", JSON.stringify(weights));
 }
 
 setInterval(async () => {
   songPlayTime += 0.2;
+  if (isSkippingSongs) {
+    return;
+  }
   const anchorElement = document.querySelector(
     'a[data-testid="context-item-link"]'
   );
@@ -33,7 +40,6 @@ setInterval(async () => {
     const songTitle = anchorElement.textContent.trim();
     await updateCurrentSong(songTitle);
   } else {
-    console.log("No song currently playing.");
   }
 }, 200);
 
@@ -41,63 +47,36 @@ async function updateCurrentSong(songTitle) {
   if (songTitle == currentPlayingSong) {
     return;
   }
+  if (isSkippingSongs) {
+    return;
+  }
+  if (currentPlayingSong == justSkippedSong) {
+    currentPlayingSong = songTitle;
+    return;
+  }
   currentPlayingSong = songTitle;
   await listeningToNewSong();
 }
 
 async function listeningToNewSong() {
-  if (refresh) {
-    return;
-  }
-  refresh = true;
   if (currentPlayingSong == lastPlayingSong) {
     songPlayTime = 0.0;
     return;
   }
-  calcNewWieght(currentPlayingSong);
+  console.log(lastPlayingSong)
+  calcNewWieght(lastPlayingSong);
+  lastPlayingSong = currentPlayingSong;
+  songPlayTime = 0.0;
+
+  var result = calcSongWeight(currentPlayingSong);
+
+  if (result) {
+    return;
+  }
+
   lastPlayingSong = currentPlayingSong;
   var queueTracks = await getUseQue();
   await getNextSong(queueTracks);
-}
-
-function calcNewWieght(songName) {
-  if (isSkippingSongs) {
-    return;
-  }
-
-  if (!songName in weights) {
-    weights[songName] = 8;
-    return;
-  }
-
-  if (songPlayTime > 30.0) {
-    weights[songName] = weights[songName] + 2;
-    checkIf0or10(songName);
-    return;
-  }
-
-  if (songPlayTime < 5.0) {
-    weights[songName] = weights[songName] - 2;
-    checkIf0or10(songName);
-    return;
-  }
-
-  if (songPlayTime < 30.0) {
-    weights[songName] = weights[songName] - 1;
-    checkIf0or10(songName);
-    return;
-  }
-}
-
-function checkIf0or10(songName) {
-  if (weights[songName] < 1) {
-    weights[songName] = 1;
-  }
-
-  if (weights[songName] > 10) {
-    weights[songName] = 10;
-  }
-  localStorage.setItem("weights", JSON.stringify(weights));
 }
 
 async function getNextSong(queue) {
@@ -105,32 +84,42 @@ async function getNextSong(queue) {
   var songPicked = false;
   var songIndex = 0;
   queue.queue.every((element, v) => {
+    if (element == false || element == true) {
+      return true;
+    }
     var isSongPicked = calcSongWeight(element);
 
     if (!isSongPicked) {
       return true;
     }
-    songToPlay = element;
+    songToPlay = element.name;
     songPicked = true;
     songIndex = v + 1;
     return false;
   });
+
   if (!songPicked) {
     noSongPicked();
   }
+
+  justSkippedSong = currentPlayingSong;
   currentPlayingSong = songToPlay;
-  await makeSkips(songIndex);
+
+  makeSkips(songIndex).then(() => {
+    isSkippingSongs = false;
+  });
 }
 
 async function makeSkips(numberOfSkips) {
   isSkippingSongs = true;
   for (let i = 0; i < numberOfSkips; i++) {
-    setTimeout(async () => {
-      await makeSkipCalls();
-      `$`;
-    }, 20);
+    await makeSkipCalls();
+    await delay(20);
   }
-  isSkippingSongs = false;
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function makeSkipCalls() {
@@ -143,19 +132,16 @@ async function makeSkipCalls() {
 }
 
 function noSongPicked() {
-  console.log("No song picked");
   return;
   //cry
 }
 
 function calcSongWeight(songName) {
-  console.log("hello world");
-  if (!songName in weights) {
-    weights[songName] = 8;
+  if (!weights.hasOwnProperty(songName)) {
+    weights[songName] = 8.0;
   }
   const songWeight = weights[songName];
   var randomNumber = Math.floor(Math.random() * 10) + 1;
-  console.log(randomNumber);
   if (randomNumber >= songWeight) {
     return false;
   }
@@ -185,7 +171,6 @@ async function getUseQue() {
 }
 
 async function refreshAccessToken() {
-  console.log(refreshToken);
   var response = await fetch("http://localhost:5107/api/refreshtoken", {
     method: "POST",
     body: JSON.stringify({ refreshToken: refreshToken }),
@@ -197,3 +182,44 @@ async function refreshAccessToken() {
   return;
 }
 
+function calcNewWieght(songName) {
+  console.log(weights);
+  if (isSkippingSongs || songName == "") {
+    return;
+  }
+
+  if (!weights.hasOwnProperty(songName)) {
+    weights[songName] = 8;
+    localStorage.setItem("weights", weights);
+    return;
+  }
+
+  if (songPlayTime > 30.0) {
+    weights[songName] = weights[songName] + 2;
+    checkIf0or10(songName);
+    return;
+  }
+
+  if (songPlayTime < 5.0) {
+    weights[songName] = weights[songName] - 2;
+    checkIf0or10(songName);
+    return;
+  }
+
+  if (songPlayTime < 30.0) {
+    weights[songName] = weights[songName] - 1;
+    checkIf0or10(songName);
+    return;
+  }
+}
+
+function checkIf0or10(songName) {
+  if (weights[songName] < 0) {
+    weights[songName] = 0;
+  }
+  if (weights[songName] > 10) {
+    weights[songName] = 10;
+  }
+  localStorage.setItem("weights", JSON.stringify(weights));
+  return;
+}
