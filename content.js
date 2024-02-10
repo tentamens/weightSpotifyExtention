@@ -19,9 +19,7 @@ token = localStorage.getItem("token");
 
 var weights = localStorage.getItem("weights");
 
-console.log(weights);
-
-weights = {};
+//weights = {};
 
 if (weights == null) {
   weights = {};
@@ -114,7 +112,7 @@ async function makeSkips(numberOfSkips) {
   isSkippingSongs = true;
   for (let i = 0; i < numberOfSkips; i++) {
     await makeSkipCalls();
-    await delay(20);
+    await delay(5);
   }
 }
 
@@ -183,7 +181,6 @@ async function refreshAccessToken() {
 }
 
 function calcNewWieght(songName) {
-  console.log(weights);
   if (isSkippingSongs || songName == "") {
     return;
   }
